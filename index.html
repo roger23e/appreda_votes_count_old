@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
+        <title>APPREDA VOTES COUNT</title>
+        
+        <link href="css/jquery.mobile-1.4.5.min.css" rel="stylesheet" type="text/css"/>
+        <link href="css/bootstrap.min.css" rel="stylesheet" type="text/css"/>
+        <link href="css/style.css" rel="stylesheet" type="text/css"/>
+        
+        <script src="js/jquery-2.1.4.min.js" type="text/javascript"></script>
+        <script src="js/jquery.mobile-1.4.5.min.js" type="text/javascript"></script>
+        <!--script src="js/bootstrap.min.js" type="text/javascript"></script-->
+
+        <script>
+            var URL                 = null;
+            var METODO              = null;
+            var VALOR               = null;
+            var LOADER              = null;
+            var ERROR               = null;
+            var USUARIO             = null;
+            var COD_OPERACION       = null;
+            var COD_CASILLA         = null;
+            var COD_VOTANTE         = null;
+            var NO_ENVIADOS         = null;
+            var NUM_NO_ENVIADOS     = null;
+            var COD_ERROR           = 0;
+            var TIPO_TRANSACCION    = 0;
+            var DATA                = null;
+            
+            
+            $(function()
+            {
+                $(this).find('td').each (function() 
+                {
+                    if($(this).text() === "7")
+                    {
+                    }
+                }); 
+                
+                $("#calculadora tr td").click(function()
+                {
+                    if ($(this).text() !== "BORRAR")
+                    {
+                        $('#votante').append($(this).text());
+                    }
+                    else
+                    {
+                        $("#votante").text("");
+                    }
+                    
+                    $("#informacion").css("display", "none");
+                    $("#error").css("display", "none");
+
+                });
+            });
+            
+            function call_Ajax_Jsonp(URL, METODO, VALOR, LOADER, ERROR, FN) 
+            {
+                $.ajax
+                ({
+                    type: "GET",
+                    url: URL,
+                    data:
+                    {
+                        m: METODO,
+                        v: VALOR
+                    },
+                    dataType: "jsonp",
+                    jsonp: "callback",
+                    jsonpCallback: "JasonpCallback",
+                    async: false,
+                    beforeSend: function()
+                    {
+                        $(LOADER).css("display", "block");
+                        $(LOADER).css("padding-bottom", "15px");
+                    },
+                    complete: function()
+                    {
+                        $(LOADER).css("display", "none");
+                    },
+                    success: function(data)
+                    {
+                        FN(data);
+                    },
+                    error: function (data) 
+                    {
+                        if (TIPO_TRANSACCION === 1)
+                        {
+                            $(ERROR).css("display", "block");
+                            $(ERROR).html("<p style='padding:10px;color:red;'>No se pudo conectar, los datos se almacenaran de manera local, debe transmitirlos manualmente cuando recupere la conexion a internet.</p>");
+                            COD_ERROR = 1;
+                        }
+                        else
+                        {
+                            $(ERROR).css("display", "block");
+                            $(ERROR).html("<p style='padding:10px; color:red;'>No se pudo conectar, por favor intente nuevamente.</p>");
+                            COD_ERROR = 0;
+                        }  
+                    }
+                });
+            }
+
+            $(document).on("pagebeforeshow", "#index", function()
+            {
+                $("#button-inicio-session").click(function(e)
+                {
+                    USUARIO             = $('#usuario').val();
+                    CLAVE               = $('#clave').val();
+                    //URL                 = "common/ws.php?format=json";
+                    URL                 = "http://escala.org.mx/APPREDA_VOTES_COUNT/common/ws.php?format=json";
+                    METODO              = "LOGIN_COUNT";
+                    VALOR               = USUARIO + "|" + CLAVE;
+                    LOADER              = "#loader";
+                    ERROR               = "#error";
+                    TIPO_TRANSACCION    = 0;
+
+                    $(ERROR).css("display", "none");
+
+                    if($("#usuario").val().length > 0 && $("#clave").val().length > 0)
+                    {    
+                        call_Ajax_Jsonp(URL, METODO, VALOR, LOADER, ERROR, function(data) 
+                        {
+                            //DATA = data;
+                            //console.log(DATA);
+                            if(data[0].RESULTADO === "0000")
+                            {
+                                localStorage.setItem("USUARIO", USUARIO);
+                                localStorage.setItem("COD_OPERACION", data[0].COD_OPERACION);
+                                localStorage.setItem("COD_CASILLA", data[0].COD_CASILLA);
+                                
+                                $.mobile.pageContainer.pagecontainer
+                                (
+                                    "change", 
+                                    "#main", 
+                                    {
+                                        showLoadMsg: true,
+                                        reload: false,
+                                        transition: "pop",
+                                        changeHash: true
+                                    }
+                                ); 
+                    
+                            }
+                            else
+                            {
+                                $(ERROR).css("display", "block");
+                                $(ERROR).html("<p style='color:red; font-size:14px;'>Usuario no encontrado.</p>");
+                                e.preventDefault();
+                            }
+                        });                         
+                    }
+                    else 
+                    {
+                        $(ERROR).css("display", "block");
+                        $(ERROR).html("<p style='color:red; font-size:14px;'>Todos los campos son obligatorios.</p>"); 
+                        e.preventDefault();
+                    }
+                });
+            });
+
+            $(document).on("pagecreate", "#main", function()
+            {   
+                COD_OPERACION = localStorage.getItem('COD_OPERACION');
+                COD_CASILLA = localStorage.getItem('COD_CASILLA');
+                USUARIO = localStorage.getItem('USUARIO');
+                $('#titulo').append("VOTANTES CASILLA: " + COD_CASILLA);
+ 
+                $("#button-guardar").click(function()
+                {
+
+                        COD_VOTANTE         = $('#votante').text();        
+                        //URL                 = "common/ws.php?format=json";
+                        URL                 = "http://escala.org.mx/APPREDA_VOTES_COUNT/common/ws.php?format=json";
+                        METODO              = "ACTUALIZAR_VOTANTES_CASILLA";
+                        VALOR               = COD_OPERACION + "|" + COD_CASILLA + "|" + COD_VOTANTE + "|" + USUARIO;
+                        LOADER              = "#loader";
+                        ERROR               = "#error";
+                        TIPO_TRANSACCION    = 1;
+
+                        call_Ajax_Jsonp(URL, METODO, VALOR, LOADER, ERROR, function(data){
+                                                       
+                        });
+                        
+                        if (COD_ERROR===1)
+                        {
+                            
+                            var NO_ENVIADOS_STR = localStorage.getItem('NO_ENVIADOS');
+                            if(NO_ENVIADOS_STR === null) 
+                            {
+                                NO_ENVIADOS = [];
+                                NO_ENVIADOS.push({ "cod_votante":COD_VOTANTE, "usuario":USUARIO});
+                            } 
+                            else
+                            {
+                                NO_ENVIADOS = JSON.parse(NO_ENVIADOS_STR);
+                                NO_ENVIADOS.push({ "cod_votante":COD_VOTANTE, "usuario":USUARIO});
+
+                            }
+                            localStorage.setItem('NO_ENVIADOS',JSON.stringify(NO_ENVIADOS));;
+                        }                    
+                    $('#votante').text(""); 
+                });
+                
+                $("#button-enviar").click(function()
+                {
+                    $("#informacion").css("display", "none");
+                    $("#error").css("display", "none");
+                    NO_ENVIADOS = localStorage.getItem("NO_ENVIADOS");
+                    if(!jQuery.isEmptyObject(NO_ENVIADOS))
+                    {
+                        NO_ENVIADOS = JSON.parse(NO_ENVIADOS);
+                        console.log(NO_ENVIADOS); 
+                        
+                        
+                        $.each(NO_ENVIADOS, function(index)
+                        {
+      
+                            //URL                 = "common/ws.php?format=json";
+                            URL                 = "http://escala.org.mx/APPREDA_VOTES_COUNT/common/ws.php?format=json";
+                            METODO              = "ACTUALIZAR_VOTANTES_CASILLA";
+                            VALOR               = COD_VOTANTE + "|" + USUARIO;
+                            LOADER              = "#loader";
+                            ERROR               = "#error";
+                            METODO              = "ACTUALIZAR_VOTANTES_CASILLA";
+                            COD_VOTANTE         = NO_ENVIADOS[index].cod_votante; 
+                            USUARIO             = NO_ENVIADOS[index].usuario;
+                            call_Ajax_Jsonp(URL, METODO, VALOR, LOADER, ERROR, function(data){                       
+                            });
+                        }); 
+                        $("#informacion").css("display", "block");
+                        $("#informacion").html("<p style='color:blue; font-size:14px;'>Datos enviados.</p>"); 
+                        localStorage.removeItem("NO_ENVIADOS");
+                    }
+                    else
+                    {
+                        $("#informacion").css("display", "block");
+                        $("#informacion").html("<p style='color:blue; font-size:14px;'>No hay datos para enviar.</p>");  
+                    }
+                    //
+                    
+                    
+                    /*
+                    if(!NO_ENVIADOS.length === 0)
+                    {
+                        
+                    }*/
+                    
+                    
+
+                   //alert(NO_ENVIADOS.cod_votante.length);
+                }); 
+            });
+        </script>
+    </head> 
+    <body>
+        <div id="index" class="ui-page" data-role="page" data-title="APPREDA MOVIL">
+            <div class="ui-content">
+                <div class="row">
+                    <div class="col-sm-6 col-md-4 col-sm-offset-3 col-md-offset-4">
+                        <div class="login-box clearfix animated flipInY">
+                            <div class="login-logo" style="padding: 20px;">
+                                <a href="#"><img class="img-responsive" src="img/logo-2.png" alt="" /></a>
+                            </div> 
+                            <div class="login-form" style="margin-top: 20px;">
+                                <input type="text" placeholder="Usuario" name="usuario" id="usuario"/> 
+                                <input type="password" placeholder="Clave" name="clave" id="clave"/> 
+                                <button type="button" name="button-inicio-session" id="button-inicio-session" class="btn btn-login">INGRESAR</button>   
+                                <div class="alert alert-danger" id="error" style="display: none">
+                                </div>
+                                <div class="alert alert-info" id="loader" style="display: none">
+                                    <img src="images/ajax-loader.gif" alt=""/>
+                                </div>   		
+                            </div> 			        	
+                       </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="main"  data-role="page" data-title="APPREDA VOTES COUNT"  >
+            <div data-role="header" data-position="fixed" data-tap-toggle="false" align="center">
+                <!--img src="img/logo.png" alt="" class="img-responsive"/-->
+                <!--a href="#nav-panel" data-icon="bars" data-iconpos="notext">Menu</a-->
+            </div>
+            <div data-role="panel" data-display="overlay" data-theme="b" id="nav-panel">
+                <ul data-role="listview">
+                    <!--li data-icon="delete">
+                        <a href="#" data-rel="close">
+                            Cerrar
+                        </a>
+                    </li-->
+                    <li>
+                        <button type="button" id="button-enviar" name="button-enviar" class="btn btn-default ">Enviar datos locales</button>
+                    </li>
+                    <li>
+                        <!--button type="button" id="cerrar-session" name="cerrar-session" class="btn btn-default ">Cerrar sesion</button-->
+                    </li>
+                </ul>
+            </div>
+
+         
+            
+            <div class="ui-content">
+                <div class="row" style="padding-top:20px;">
+                    <div class="col-lg-4 col-lg-offset-4 col-md-8 col-md-offset-2 col-sm-10 col-sm-offset-1 col-xs-12">
+                        <div class="panel panel-default">    
+                            <div class="panel-heading" id="titulo" style="text-align:center;" >
+                            </div>
+                            <div class="panel-body" style="padding-top:30px; text-align:center;">
+                                <div class="col-lg-6 col-lg-offset-3 col-md-8 col-md-offset-2 col-sm-10 col-sm-offset-1 col-xs-12">
+                                    <label id="votante" style="text-align: center;width: 100%; border:1px solid #ddd; height:40px; padding-top:8px;  "></label>
+                                    <table id="calculadora" style="width: 100%" >
+                                        <tr>
+                                            <td>7</td>
+                                            <td>8</td>
+                                            <td>9</td>
+                                        </tr>
+                                        <tr>
+                                            <td>4</td>
+                                            <td>5</td>
+                                            <td>6</td>
+                                        </tr>
+                                        <tr>
+                                            <td>1</td>
+                                            <td>2</td>
+                                            <td>3</td>
+                                        </tr>
+                                        <tr>
+                                            <td>0</td>
+                                            <td colspan="2">BORRAR</td>
+                                        </tr>
+                                    </table>
+                                    <button type="button" id="button-guardar" name="button-guardar" class="btn btn-default ">GUARDAR</button>
+                                    <div class="alert alert-danger" id="error" style="display: none; margin-top:30px; ">
+                                    </div>
+                                    <div class="alert alert-info" id="informacion" style="display: none">
+                                    </div>  
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div data-role="footer" data-position="fixed" data-tap-toggle="false">
+            </div>
+        </div>
+    </body>
+</html>
